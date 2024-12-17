@@ -1,2 +1,3 @@
-arduino/secrets.h
+arduino/sketch_dec11a/secrets.h
 *.env
+server/src/main/resources/application.properties

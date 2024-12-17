@@ -48,6 +48,18 @@ void loop() {
   char payload[100];
   snprintf(payload, sizeof(payload), "{\"total_current\": %.2f, \"led_current\": %.2f, \"motor_current\": %.2f}", total_current, led_current, motor_current);
 
+// Prepare JSON payload
+  // char payload[256];
+  // snprintf(payload, sizeof(payload),
+  //          "{"
+  //          "\"total_current\":{\"value\":%.2f,\"timestamp\":%lu},"
+  //          "\"led_current\":{\"value\":%.2f,\"timestamp\":%lu},"
+  //          "\"motor_current\":{\"value\":%.2f,\"timestamp\":%lu}"
+  //          "}",
+  //          total_current, timestamp,
+  //          led_current, timestamp,
+  //          motor_current, timestamp);
+
   Serial.println(payload);
   bool retained = false;
     int qos = 1;
