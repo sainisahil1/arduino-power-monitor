@@ -1,38 +1,46 @@
 package io.sahil.server.core.model;
 
 /**
- * Data class for data received from mqtt
+ * Data class for individual sensor
  *
  * @author Sahil Saini
  */
 public class MqttPayload {
 
-    private CurrentData totalCurrent;
-    private CurrentData motorCurrent;
-    private CurrentData ledCurrent;
+    private String sensorId;
+    private float current;
+    private long timestamp;
+    private float voltage;
 
-    public CurrentData getTotalCurrent() {
-        return totalCurrent;
+    public float getVoltage() {
+        return voltage;
     }
 
-    public void setTotalCurrent(CurrentData totalCurrent) {
-        this.totalCurrent = totalCurrent;
+    public void setVoltage(float voltage) {
+        this.voltage = voltage;
     }
 
-    public CurrentData getMotorCurrent() {
-        return motorCurrent;
+    public String getSensorId() {
+        return sensorId;
     }
 
-    public void setMotorCurrent(CurrentData motorCurrent) {
-        this.motorCurrent = motorCurrent;
+    public void setSensorId(String sensorId) {
+        this.sensorId = sensorId;
     }
 
-    public CurrentData getLedCurrent() {
-        return ledCurrent;
+    public float getCurrent() {
+        return current;
     }
 
-    public void setLedCurrent(CurrentData ledCurrent) {
-        this.ledCurrent = ledCurrent;
+    public void setCurrent(float current) {
+        this.current = current;
     }
 
+    public long getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
+    }
 }

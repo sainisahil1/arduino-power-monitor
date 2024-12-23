@@ -1,12 +1,11 @@
 package io.sahil.server.infrastructure.config;
 
-import com.influxdb.v3.client.InfluxDBClient;
-import com.influxdb.v3.client.config.ClientConfig;
+import com.influxdb.client.InfluxDBClient;
+import com.influxdb.client.InfluxDBClientFactory;
 import io.sahil.server.util.InfluxConstants;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.env.Environment;
 
 /**
  * This class provides InfluxDBClient bean
@@ -17,24 +16,29 @@ import org.springframework.core.env.Environment;
 @Configuration
 public class InfluxConfig implements InfluxConstants {
 
-    private final Environment environment;
+    @Value("${"+INFLUX_HOST+"}")
+    private String host;
 
-    @Autowired
-    public InfluxConfig(Environment environment) {
-        this.environment = environment;
-    }
+    @Value("${"+INFLUX_BUCKET+"}")
+    private String bucket;
+
+    @Value("${"+INFLUX_TOKEN+"}")
+    private String token;
+
+    @Value("${"+INFLUX_ORG+"}")
+    private String org;
 
     @Bean
-    public InfluxDBClient InfluxDBClient() {
-        String token = environment.getProperty(INFLUX_TOKEN);
-        String host = environment.getProperty(INFLUX_HOST);
-        assert host != null;
+    public InfluxDBClient influxDBClient() {
         assert token != null;
-        ClientConfig config = new ClientConfig.Builder()
-                .host(host)
-                .token(token.toCharArray())
-                .build();
-        return InfluxDBClient.getInstance(config);
+        return InfluxDBClientFactory.create(host, token.toCharArray());
     }
 
+    public String getBucket() {
+        return bucket;
+    }
+
+    public String getOrg() {
+        return org;
+    }
 }

@@ -40,10 +40,16 @@
             <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
             <version>1.2.5</version>
         </dependency>
+<!--        <dependency>-->
+<!--            <groupId>com.influxdb</groupId>-->
+<!--            <artifactId>influxdb3-java</artifactId>-->
+<!--            <version>0.2.0</version>-->
+<!--        </dependency>-->
         <dependency>
             <groupId>com.influxdb</groupId>
-            <artifactId>influxdb3-java</artifactId>
-            <version>0.2.0</version>
+            <artifactId>influxdb-client-java</artifactId>
+            <version>3.3.0</version>
+
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
