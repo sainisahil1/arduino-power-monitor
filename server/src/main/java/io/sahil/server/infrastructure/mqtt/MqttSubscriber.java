@@ -1,5 +1,10 @@
-package io.sahil.server.mqtt;
+package io.sahil.server.infrastructure.mqtt;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.sahil.server.core.model.MqttPayload;
+import io.sahil.server.core.repository.InfluxDBRepository;
+import io.sahil.server.util.MqttConstants;
+import io.sahil.server.util.MqttDataProcessor;
 import jakarta.annotation.PostConstruct;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
@@ -11,33 +16,44 @@ import java.util.UUID;
 import java.util.logging.Logger;
 
 /**
+ * This class is the implementation of MQTT Subscriber
+ * It connects to MQTT service and subscribe to set topic.
+ *
  * @author Sahil Saini
  */
 
 @Component
-public class MqttSubscriberImpl implements MqttCallback, MqttConstants {
+public class MqttSubscriber implements MqttCallback, MqttConstants {
 
-    private MqttConnectOptions mqttConnectOptions;
+    private final MqttConnectOptions mqttConnectOptions;
     Environment environment;
     private MqttClient mqttClient;
     private MemoryPersistence memoryPersistence;
+    private InfluxDBRepository influxDBRepository;
+    private MqttDataProcessor mqttDataProcessor;
 
-    private final Logger logger = Logger.getLogger(MqttSubscriberImpl.class.getName());
+    private final Logger logger = Logger.getLogger(MqttSubscriber.class.getName());
     final private String clientId = UUID.randomUUID().toString();
 
     @Autowired
-    public MqttSubscriberImpl(MqttConnectOptions mqttConnectOptions, Environment environment) {
+    public MqttSubscriber(
+            MqttConnectOptions mqttConnectOptions,
+            InfluxDBRepository influxDBRepository,
+            MqttDataProcessor mqttDataProcessor,
+            Environment environment
+    ) {
         logger.info("Initializing MqttSubscriberImpl");
         this.mqttConnectOptions = mqttConnectOptions;
+        this.influxDBRepository = influxDBRepository;
+        this.mqttDataProcessor = mqttDataProcessor;
         this.environment = environment;
     }
 
     @PostConstruct
-    private void config() {
-        logger.info("Entry config method");
+    private void init() {
+        logger.info("Entry init method");
         memoryPersistence = new MemoryPersistence();
-        String url = this.environment.getProperty(brokerHost);
-        logger.info("Broker URL: " + url);
+        String url = this.environment.getProperty(MQTT_HOST);
         try{
             connectMqtt(url);
         } catch (MqttException e) {
@@ -53,9 +69,8 @@ public class MqttSubscriberImpl implements MqttCallback, MqttConstants {
     }
 
     private void subscribe() throws MqttException {
-        String topic = environment.getProperty(brokerTopic);
-        int qos = 0;
-        mqttClient.subscribe(topic, qos);
+        String topic = environment.getProperty(MQTT_TOPIC);
+        mqttClient.subscribe(topic, MQTT_QOS);
     }
 
     @Override
@@ -65,8 +80,8 @@ public class MqttSubscriberImpl implements MqttCallback, MqttConstants {
 
     @Override
     public void messageArrived(String topic, MqttMessage message) throws Exception {
-        logger.info("Message arrived");
-        logger.info(new String(message.getPayload()));
+        MqttPayload payload = mqttDataProcessor.processMqttMessage(message.toString());
+        influxDBRepository.save(payload);
     }
 
     @Override
