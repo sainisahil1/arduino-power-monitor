@@ -8,17 +8,8 @@ package io.sahil.server.core.model;
 public class MqttPayload {
 
     private String sensorId;
-    private float current;
+    private float power;
     private long timestamp;
-    private float voltage;
-
-    public float getVoltage() {
-        return voltage;
-    }
-
-    public void setVoltage(float voltage) {
-        this.voltage = voltage;
-    }
 
     public String getSensorId() {
         return sensorId;
@@ -28,12 +19,12 @@ public class MqttPayload {
         this.sensorId = sensorId;
     }
 
-    public float getCurrent() {
-        return current;
+    public float getPower() {
+        return power;
     }
 
-    public void setCurrent(float current) {
-        this.current = current;
+    public void setPower(float power) {
+        this.power = power;
     }
 
     public long getTimestamp() {
@@ -42,5 +33,14 @@ public class MqttPayload {
 
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
+    }
+
+    @Override
+    public String toString() {
+        return "MqttPayload{" +
+                "sensorId='" + sensorId + '\'' +
+                ", power=" + power +
+                ", timestamp=" + timestamp +
+                '}';
     }
 }
