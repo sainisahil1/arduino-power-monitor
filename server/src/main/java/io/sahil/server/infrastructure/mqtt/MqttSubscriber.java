@@ -82,7 +82,7 @@ public class MqttSubscriber implements MqttCallback, MqttConstants {
     @Override
     public void messageArrived(String topic, MqttMessage message) {
         logger.info("Message arrived: "+message);
-        List<MqttPayload> payload = mqttDataProcessor.processMqttMessage(message.toString());
+        MqttPayload payload = mqttDataProcessor.processMqttMessage(message.toString());
         influxDBRepository.save(payload);
     }
 

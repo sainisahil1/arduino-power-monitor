@@ -59,24 +59,22 @@ public class InfluxDBRepository implements InfluxConstants {
      * Write MQTT payload to InfluxDB
      * @param payload MQTT Payload
      */
-    public void save(List<MqttPayload> payload) {
-        for (MqttPayload payloadObj : payload) {
-            writeToInflux(payloadObj);
-        }
-    }
-
-    /**
-     * Execute write operation
-     * @param payloadObj payload
-     */
-    private void writeToInflux(MqttPayload payloadObj) {
+    public void save(MqttPayload payload) {
         String bucket = influxConfig.getBucket();
         String org = influxConfig.getOrg();
-        Point point = Point.measurement(INFLUX_MEASUREMENT)
-                .addTag(INFLUX_SENSOR_ID, payloadObj.getSensorId())
-                .addField(INFLUX_VALUE, payloadObj.getPower())
-                .time(payloadObj.getTimestamp(), WritePrecision.MS);
-        writeApi.writePoint(bucket, org, point);
+        Point ledPoint = generatePoint(payload.getLedReading(), INFLUX_SENSOR_LED, payload.getTimestamp());
+        Point motorPoint = generatePoint(payload.getMotorReading(), INFLUX_SENSOR_MOTOR, payload.getTimestamp());
+        Point totalPoint = generatePoint(payload.getTotalReading(), INFLUX_SENSOR_TOTAL, payload.getTimestamp());
+        writeApi.writePoint(bucket, org, ledPoint);
+        writeApi.writePoint(bucket, org, motorPoint);
+        writeApi.writePoint(bucket, org, totalPoint);
+    }
+
+    private Point generatePoint(float reading, String sensorId, long timestamp) {
+        return Point.measurement(INFLUX_MEASUREMENT)
+                .addTag(INFLUX_SENSOR_ID, sensorId)
+                .addField(INFLUX_VALUE, reading)
+                .time(timestamp, WritePrecision.MS);
     }
 
     /**

@@ -24,9 +24,9 @@ public class MqttDataProcessor {
         this.objectMapper = objectMapper;
     }
 
-    public List<MqttPayload> processMqttMessage(String payload) {
+    public MqttPayload processMqttMessage(String payload) {
         try{
-            return objectMapper.readValue(payload, objectMapper.getTypeFactory().constructCollectionType(List.class, MqttPayload.class));
+            return objectMapper.readValue(payload, MqttPayload.class);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }

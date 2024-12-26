@@ -60,6 +60,7 @@ void loop() {
 
 // Prepare JSON payload
   char payload[256];
+  //Change this
   snprintf(payload, sizeof(payload),
            "{"
            "\"total_current\":{\"value\":%.2f,\"timestamp\":%lu},"

@@ -1,30 +1,47 @@
 package io.sahil.server.core.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.sahil.server.util.InfluxConstants;
+
 /**
  * Data class for individual sensor
  *
  * @author Sahil Saini
  */
-public class MqttPayload {
+public class MqttPayload implements InfluxConstants {
 
-    private String sensorId;
-    private float power;
+    @JsonProperty(INFLUX_SENSOR_LED)
+    private float ledReading;
+
+    @JsonProperty(INFLUX_SENSOR_TOTAL)
+    private float totalReading;
+
+    @JsonProperty(INFLUX_SENSOR_MOTOR)
+    private float motorReading;
     private long timestamp;
 
-    public String getSensorId() {
-        return sensorId;
+    public float getTotalReading() {
+        return totalReading;
     }
 
-    public void setSensorId(String sensorId) {
-        this.sensorId = sensorId;
+    public void setTotalReading(float totalReading) {
+        this.totalReading = totalReading;
     }
 
-    public float getPower() {
-        return power;
+    public float getMotorReading() {
+        return motorReading;
     }
 
-    public void setPower(float power) {
-        this.power = power;
+    public void setMotorReading(float motorReading) {
+        this.motorReading = motorReading;
+    }
+
+    public float getLedReading() {
+        return ledReading;
+    }
+
+    public void setLedReading(float ledReading) {
+        this.ledReading = ledReading;
     }
 
     public long getTimestamp() {
@@ -38,8 +55,9 @@ public class MqttPayload {
     @Override
     public String toString() {
         return "MqttPayload{" +
-                "sensorId='" + sensorId + '\'' +
-                ", power=" + power +
+                "ledReading=" + ledReading +
+                ", totalReading=" + totalReading +
+                ", motorReading=" + motorReading +
                 ", timestamp=" + timestamp +
                 '}';
     }
