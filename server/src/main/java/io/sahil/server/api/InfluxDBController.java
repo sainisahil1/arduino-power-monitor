@@ -16,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
  * @author Sahil Saini
  */
 @RestController
+@CrossOrigin
 public class InfluxDBController {
 
     private final InfluxDBRepository repository;
@@ -25,7 +26,6 @@ public class InfluxDBController {
         this.repository = repository;
     }
 
-    @CrossOrigin
     @GetMapping("/data")
     public InfluxDTO getData(
             @RequestParam(value = "time", defaultValue = "daily") String time,

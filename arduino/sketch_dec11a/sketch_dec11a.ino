@@ -4,11 +4,15 @@
 #include <WiFi.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
+#include <Adafruit_INA219.h>
 
 WiFiSSLClient espClient;
 MqttClient mqttClient(espClient);
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", 3600, 60000);
+Adafruit_INA219 ina219_LED(0x40);
+Adafruit_INA219 ina219_Motor(0x41);
+Adafruit_INA219 ina219_Total(0x42);
 
 void connectToMQTT() {
   while (!mqttClient.connected()) {
@@ -22,6 +26,23 @@ void connectToMQTT() {
       delay(5000);
     }
   }
+}
+
+void initializeSensors(){
+  Serial.println("Initializing sensors");
+  if (!ina219_LED.begin()) {
+    Serial.println("Failed to find INA219 for LED");
+    while (1);
+  }
+  if (!ina219_Motor.begin()) {
+    Serial.println("Failed to find INA219 for Motor");
+    while (1);
+  }
+  if (!ina219_Total.begin()) {
+    Serial.println("Failed to find INA219 for Total");
+    while (1);
+  }
+  Serial.println("INA219 sensors initialized!");
 }
 
 void setup() {
@@ -38,6 +59,7 @@ void setup() {
   mqttClient.setUsernamePassword(USERNAME, PASS);
   mqttClient.setKeepAliveInterval(60000);
   connectToMQTT();
+  initializeSensors();
 }
 
 void loop() {
@@ -53,23 +75,21 @@ void loop() {
   if (millis() - lastPublishTime >= 5000) {
     lastPublishTime = millis();
 
-  float total_current = random(1000) / 100.0;
-  float led_current = random(1000) / 100.0;
-  float motor_current = random(1000) / 100.0;
+  float power_LED = ina219_LED.getPower_mW() / 1000;
+  float power_Motor = ina219_Motor.getPower_mW() / 1000;
+  float power_Total = ina219_Total.getPower_mW() / 1000;
   long timestamp = timeClient.getEpochTime();
 
 // Prepare JSON payload
   char payload[256];
-  //Change this
   snprintf(payload, sizeof(payload),
            "{"
-           "\"total_current\":{\"value\":%.2f,\"timestamp\":%lu},"
-           "\"led_current\":{\"value\":%.2f,\"timestamp\":%lu},"
-           "\"motor_current\":{\"value\":%.2f,\"timestamp\":%lu}"
+           "\"total_reading\":%.2f,"
+           "\"led_reading\":%.2f,"
+           "\"motor_reading\":%.2f,"
+           "\"timestamp\":%lu"
            "}",
-           total_current, timestamp,
-           led_current, timestamp,
-           motor_current, timestamp);
+           power_Total, power_LED, power_Motor, timestamp);
 
   Serial.println(payload);
 

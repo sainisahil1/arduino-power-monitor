@@ -55,7 +55,7 @@ public class MqttSubscriber implements MqttCallback, MqttConstants {
         memoryPersistence = new MemoryPersistence();
         String url = mqttConfig.getHost();
         logger.info("Connecting to " + url);
-        try{
+        try {
             connectMqtt(url);
         } catch (MqttException e) {
             e.printStackTrace();
@@ -81,7 +81,7 @@ public class MqttSubscriber implements MqttCallback, MqttConstants {
 
     @Override
     public void messageArrived(String topic, MqttMessage message) {
-        logger.info("Message arrived: "+message);
+        logger.info("Message arrived: " + message);
         MqttPayload payload = mqttDataProcessor.processMqttMessage(message.toString());
         influxDBRepository.save(payload);
     }
