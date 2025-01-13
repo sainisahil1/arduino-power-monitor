@@ -5,14 +5,21 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include <Adafruit_INA219.h>
+#include <Wire.h>
 
 WiFiSSLClient espClient;
 MqttClient mqttClient(espClient);
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", 3600, 60000);
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 0, 60000);
 Adafruit_INA219 ina219_LED(0x40);
 Adafruit_INA219 ina219_Motor(0x41);
-Adafruit_INA219 ina219_Total(0x42);
+Adafruit_INA219 ina219_Total(0x44);
+float totalSum = 0;
+float ledSum = 0;
+float motorSum = 0;
+float count = 0;
+unsigned long lastPublishTime = 0;
+
 
 void connectToMQTT() {
   while (!mqttClient.connected()) {
@@ -45,10 +52,21 @@ void initializeSensors(){
   Serial.println("INA219 sensors initialized!");
 }
 
+
+void checkForWifi(){
+  while (WiFi.status() != WL_CONNECTED) {
+    WiFi.begin(ssid, password);
+    delay(500);
+    Serial.print(".");
+  }
+}
+
 void setup() {
-  
-  Serial.begin(115200);
-  delay(1500); 
+  Wire.begin();
+  Serial.begin(9600);
+  delay(10); 
+
+  initializeSensors();
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -59,7 +77,7 @@ void setup() {
   mqttClient.setUsernamePassword(USERNAME, PASS);
   mqttClient.setKeepAliveInterval(60000);
   connectToMQTT();
-  initializeSensors();
+  lastPublishTime = millis();
 }
 
 void loop() {
@@ -67,18 +85,30 @@ void loop() {
   mqttClient.poll();
   timeClient.update();
 
-  if(!mqttClient.connected()){
-    connectToMQTT();
-  }
+  float power_LED = ina219_LED.getPower_mW();
+  float power_Motor = ina219_Motor.getPower_mW();
+  float power_Total = ina219_Total.getPower_mW();
 
-  static unsigned long lastPublishTime = 0;
+  totalSum = totalSum + power_Total;
+  ledSum = ledSum + power_LED;
+  motorSum = motorSum + power_Motor;
+  count++;
+  
+
   if (millis() - lastPublishTime >= 5000) {
-    lastPublishTime = millis();
+    checkForWifi();
 
-  float power_LED = ina219_LED.getPower_mW() / 1000;
-  float power_Motor = ina219_Motor.getPower_mW() / 1000;
-  float power_Total = ina219_Total.getPower_mW() / 1000;
-  long timestamp = timeClient.getEpochTime();
+  if(!mqttClient.connected()){
+   connectToMQTT();
+  }
+    lastPublishTime = millis();
+    long timestamp = timeClient.getEpochTime();
+    
+
+    float totalAvg = totalSum / count;
+    float motorAvg = motorSum / count;
+    float ledAvg = ledSum / count;
+  
 
 // Prepare JSON payload
   char payload[256];
@@ -89,9 +119,15 @@ void loop() {
            "\"motor_reading\":%.2f,"
            "\"timestamp\":%lu"
            "}",
-           power_Total, power_LED, power_Motor, timestamp);
+           totalAvg, ledAvg, motorAvg, timestamp);
+
 
   Serial.println(payload);
+
+  totalSum = 0;
+  ledSum = 0;
+  motorSum = 0;
+  count = 0;
 
     mqttClient.beginMessage(TOPIC);
     mqttClient.print(payload);

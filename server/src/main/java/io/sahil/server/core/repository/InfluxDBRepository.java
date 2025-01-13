@@ -74,7 +74,7 @@ public class InfluxDBRepository implements InfluxConstants {
         return Point.measurement(INFLUX_MEASUREMENT)
                 .addTag(INFLUX_SENSOR_ID, sensorId)
                 .addField(INFLUX_VALUE, reading)
-                .time(timestamp, WritePrecision.MS);
+                .time(timestamp, WritePrecision.S);
     }
 
     /**
@@ -95,10 +95,14 @@ public class InfluxDBRepository implements InfluxConstants {
         ArrayList<SensorDataDTO> totalReading = new ArrayList<>();
         ArrayList<SensorDataDTO> ledReading = new ArrayList<>();
         ArrayList<SensorDataDTO> motorReading = new ArrayList<>();
+        logger.info(query);
         List<FluxTable> tables = queryApi.query(query, influxConfig.getOrg());
+        logger.info(String.valueOf(tables.size()));
         for (FluxTable table : tables) {
+            logger.info(table.toString());
             for (FluxRecord record : table.getRecords()) {
                 SensorDataDTO sensorDataDTO = extractSensorData(record);
+                logger.info(sensorDataDTO.toString());
                 Object sensorId = record.getValueByKey(INFLUX_SENSOR_ID);
                 assert sensorId != null;
                 switch ((String) sensorId) {

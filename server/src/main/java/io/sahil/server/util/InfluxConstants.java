@@ -14,7 +14,9 @@ public interface InfluxConstants {
     String INFLUX_SENSOR_LED = "led_reading";
     String INFLUX_SENSOR_MOTOR = "motor_reading";
     String INFLUX_VALUE = "_value";
-    String INFLUX_POWER_THRESHOLD = "2.5";
+    String INFLUX_TOTAL_THRESHOLD = "800";
+    String INFLUX_LED_THRESHOLD = "300";
+    String INFLUX_MOTOR_THRESHOLD = "500";
     int INFLUX_BATCH_SIZE = 12;
     int INFLUX_FLUSH_INTERVAL = 70000;
     String INFLUX_RANGE_DAILY = "-1d";
