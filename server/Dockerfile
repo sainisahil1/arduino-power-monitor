@@ -12,7 +12,7 @@ COPY . .
 RUN mvn clean package -DskipTests
 
 # Copy the built JAR file from the host machine to the container
-COPY target/server-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=build /app/target/*.jar app.jar
 
 # Expose the application port (same as in application.properties)
 EXPOSE 8080
