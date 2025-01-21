@@ -38,6 +38,9 @@ const float LED_MAX_THRESHOLD    = 700.0f;
 const float MOTOR_MAX_THRESHOLD  = 2000.0f;
 const float TOTAL_MAX_THRESHOLD  = 3000.0f;
 
+// Submission Frequency / How often to send to MQTT (ms)
+const uint MQTT_SUBMISSION_FREQUENCY = 5000;
+
 // ======================= Helper functions =======================
 
 /**
@@ -248,7 +251,7 @@ void loop() {
   fadeRgbByReading(avgPowerTotal, 200.0f, TOTAL_MAX_THRESHOLD, TOTAL_RGB_RED_PIN,  TOTAL_RGB_GREEN_PIN);
 
   // Publish data roughly every second
-  if (millis() - lastPublishTime >= 1000) {
+  if (millis() - lastPublishTime >= MQTT_SUBMISSION_FREQUENCY) {
     checkForWiFi();
     checkForMQTT();
 
