@@ -266,11 +266,9 @@ void loop() {
       "\"total_reading\":%.2f,"
       "\"led_reading\":%.2f,"
       "\"motor_reading\":%.2f,"
-      "\"difference\":%.2f,"
-      "\"samples\":%lu,"
       "\"timestamp\":%lu"
       "}",
-      avgPowerTotal, avgPowerLed, avgPowerMotor, difference, samplesTaken, timestamp
+      avgPowerTotal, avgPowerLed, avgPowerMotor, timestamp
     );
 
     Serial.println(payload);
