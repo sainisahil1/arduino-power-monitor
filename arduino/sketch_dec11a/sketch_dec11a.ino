@@ -5,220 +5,270 @@
 #include <WiFiUdp.h>
 #include <Adafruit_INA219.h>
 
-WiFiSSLClient espClient;
-MqttClient mqttClient(espClient);
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", 7200, 60000);
+// ======================= Global objects & variables =======================
 
-unsigned long lastPublishTime = 0;
-unsigned int samplesTaken = 0;
+WiFiSSLClient        espClient;
+MqttClient           mqttClient(espClient);
+WiFiUDP              ntpUDP;
+NTPClient            timeClient(ntpUDP, "pool.ntp.org", 7200, 60000);
 
-float sum_power_mW_LED = 0;
-float sum_power_mW_MOTOR = 0;
-float sum_power_mW_TOTAL = 0;
+unsigned long lastPublishTime  = 0;
+unsigned long samplesTaken     = 0;
 
-Adafruit_INA219 ina219_LED(0x41);
-Adafruit_INA219 ina219_MOTOR(0x44);
-Adafruit_INA219 ina219_TOTAL(0x40);
+float sumPowerLed   = 0.0f;
+float sumPowerMotor = 0.0f;
+float sumPowerTotal = 0.0f;
 
-const int wifi_INDICATOR_LED = A6;
-const int mqtt_INDICATOR_LED = A3;
+Adafruit_INA219 ina219Led(0x41);
+Adafruit_INA219 ina219Motor(0x44);
+Adafruit_INA219 ina219Total(0x40);
 
-const int led_RGB_RED_PIN = 5;
-const int led_RGB_GREEN_PIN = 4;
-const int motor_RGB_RED_PIN = 3;
-const int motor_RGB_GREEN_PIN = 2;
-const int total_RGB_RED_PIN = 0;
-const int total_RGB_GREEN_PIN = 1;
+// Indicator and RGB pins
+const int WIFI_INDICATOR_LED     = A6;
+const int MQTT_INDICATOR_LED     = A3;
+const int LED_RGB_RED_PIN        = 5;
+const int LED_RGB_GREEN_PIN      = 4;
+const int MOTOR_RGB_RED_PIN      = 3;
+const int MOTOR_RGB_GREEN_PIN    = 2;
+const int TOTAL_RGB_RED_PIN      = 0;
+const int TOTAL_RGB_GREEN_PIN    = 1;
 
-const float led_MAXIMUM_THRESHOLD_MW = 700L;
-const float motor_MAXIMUM_THRESHOLD_MW = 2000L;
-const float total_MAXIMUM_THRESHOLD_MW = 3000L;
+// Thresholds
+const float LED_MAX_THRESHOLD    = 700.0f;
+const float MOTOR_MAX_THRESHOLD  = 2000.0f;
+const float TOTAL_MAX_THRESHOLD  = 3000.0f;
 
-void connectToMQTT() {
-  mqttClient.setUsernamePassword(USERNAME, PASS);
-  mqttClient.setKeepAliveInterval(60000);
+// ======================= Helper functions =======================
 
-  while (!mqttClient.connected()) {
-    digitalWrite(mqtt_INDICATOR_LED, HIGH);
-    Serial.println("Connecting to MQTT...");
-    if (mqttClient.connect(PUBSUB_ENDPOINT, PORT)) {
-      Serial.println("Connected to MQTT broker");
-      digitalWrite(mqtt_INDICATOR_LED, LOW);
-    } else {
-      Serial.print("Failed, rc=");
-      Serial.print(mqttClient.connectError());
-      Serial.println(" Trying again in 1 second...");
-      for (int i = 0; i < 3; i++) {
-        delay(250);
-        digitalWrite(mqtt_INDICATOR_LED, LOW);
-        delay(250);
-        digitalWrite(mqtt_INDICATOR_LED, HIGH);
-      }
-    }
-  }
-  digitalWrite(mqtt_INDICATOR_LED, LOW);
+/**
+ * Turns an indicator LED on or off.
+ */
+void setIndicatorLed(int pin, bool isOn) {
+  digitalWrite(pin, (isOn ? HIGH : LOW));
 }
 
-void initializeSensors() {
-  Serial.println("Initializing sensors");
-  if (!ina219_LED.begin()) {
-    Serial.println("Failed to find LED INA219");
-    analogWrite(led_RGB_RED_PIN, 255);
-    analogWrite(led_RGB_GREEN_PIN, 0);
-    while (1)
-      ;
-  }
-
-  analogWrite(led_RGB_RED_PIN, 0);
-  analogWrite(led_RGB_GREEN_PIN, 255);
-
-  Serial.println("INA219 LED sensor initialized! :)");
-  if (!ina219_MOTOR.begin()) {
-    Serial.println("Failed to find MOTOR INA219");
-    analogWrite(motor_RGB_RED_PIN, 255);
-    analogWrite(motor_RGB_GREEN_PIN, 0);
-    while (1)
-      ;
-  }
-  analogWrite(motor_RGB_RED_PIN, 0);
-  analogWrite(motor_RGB_GREEN_PIN, 255);
-  Serial.println("INA219 MOTOR sensor initialized! :)");
-
-  if (!ina219_TOTAL.begin()) {
-    Serial.println("Failed to find TOTAL INA219");
-    analogWrite(total_RGB_RED_PIN, 255);
-    analogWrite(total_RGB_GREEN_PIN, 0);
-    while (1)
-      ;
-  }
-  analogWrite(total_RGB_RED_PIN, 0);
-  analogWrite(total_RGB_GREEN_PIN, 255);
-  Serial.println("INA219 TOTAL sensor initialized! :)");
-
-  Serial.println("ALL INA219 sensors initialized! :)");
+/**
+ * Sets an RGB pair to show a single colour: RED or GREEN.
+ * If `redOn = true` and `greenOn = false`, the pins show RED.
+ * If `redOn = false` and `greenOn = true`, the pins show GREEN.
+ * If both are false, the pins are turned off.
+ */
+void setSimpleRgb(int redPin, int greenPin, bool redOn, bool greenOn) {
+  analogWrite(redPin,   (redOn   ? 255 : 0));
+  analogWrite(greenPin, (greenOn ? 255 : 0));
 }
 
-void checkForWiFi(bool firstEverCheck) {
+/**
+ * Maps a (power) reading to a fade value on red/green pins:
+ *   - “readingMin” (lower input bound)
+ *   - “readingMax” (upper input bound)
+ */
+void fadeRgbByReading(float reading,
+                      float readingMin,
+                      float readingMax,
+                      int   redPin,
+                      int   greenPin) {
+  // Convert reading to int for map
+  int fadeValue = map((long)reading, (long)readingMin, (long)readingMax, 0, 255);
+  fadeValue     = constrain(fadeValue, 0, 255);
+
+  // Red goes from 0 to fadeValue, green from 255 down to some remainder
+  analogWrite(redPin, fadeValue);
+  analogWrite(greenPin, 255 - fadeValue);
+}
+
+/**
+ * Connects to the Wi-Fi network. If not successful immediately, it keeps trying
+ * until a connection is established.
+ */
+void connectWiFi(bool isFirstCheck) {
   while (WiFi.status() != WL_CONNECTED) {
-    digitalWrite(wifi_INDICATOR_LED, HIGH);
+    setIndicatorLed(WIFI_INDICATOR_LED, true);
     WiFi.begin(ssid, password);
+
+    // Blink the Wi-Fi indicator LED a few times to show we are trying
     for (int i = 0; i < 3; i++) {
       delay(250);
-      digitalWrite(wifi_INDICATOR_LED, LOW);
+      setIndicatorLed(WIFI_INDICATOR_LED, false);
       delay(250);
-      digitalWrite(wifi_INDICATOR_LED, HIGH);
+      setIndicatorLed(WIFI_INDICATOR_LED, true);
     }
-    Serial.println("Wi-Fi Not Connected. Trying to Connect...");
+    Serial.println("Wi-Fi not connected. Retrying...");
   }
-  digitalWrite(wifi_INDICATOR_LED, LOW);
-  if (firstEverCheck) {
+
+  setIndicatorLed(WIFI_INDICATOR_LED, false);
+  if (isFirstCheck) {
     Serial.println("Connected to Wi-Fi!");
   }
 }
 
-void checkForMQTT() {
-  if (!mqttClient.connected()) {
-    connectToMQTT();
+/**
+ * Connects to the MQTT broker. If the connection fails, it tries repeatedly.
+ */
+void connectMQTT() {
+  mqttClient.setUsernamePassword(USERNAME, PASS);
+  mqttClient.setKeepAliveInterval(60000);
+
+  while (!mqttClient.connected()) {
+    setIndicatorLed(MQTT_INDICATOR_LED, true);
+    Serial.println("Connecting to MQTT...");
+
+    if (mqttClient.connect(PUBSUB_ENDPOINT, PORT)) {
+      Serial.println("Connected to MQTT broker!");
+      setIndicatorLed(MQTT_INDICATOR_LED, false);
+    } else {
+      Serial.print("Failed, rc=");
+      Serial.print(mqttClient.connectError());
+      Serial.println(". Trying again in 1 second...");
+
+      // Blink the MQTT indicator a few times
+      for (int i = 0; i < 3; i++) {
+        delay(250);
+        setIndicatorLed(MQTT_INDICATOR_LED, false);
+        delay(250);
+        setIndicatorLed(MQTT_INDICATOR_LED, true);
+      }
+    }
+  }
+  setIndicatorLed(MQTT_INDICATOR_LED, false);
+}
+
+/**
+ * Initializes one INA219 sensor. If it fails, sets the corresponding RGB pins
+ * to red and stops execution.
+ */
+void initializeSensor(Adafruit_INA219 &sensor,
+                      const char      *name,
+                      int              redPin,
+                      int              greenPin) {
+  Serial.print("Initializing INA219: ");
+  Serial.println(name);
+
+  if (!sensor.begin()) {
+    Serial.print("Failed to find INA219 for ");
+    Serial.println(name);
+    setSimpleRgb(redPin, greenPin, true, false);  // red on
+    while (true) { /* Halt here */ }
+  }
+  // If success, switch the sensor's LED to green
+  setSimpleRgb(redPin, greenPin, false, true);
+  Serial.print("INA219 ");
+  Serial.print(name);
+  Serial.println(" sensor initialized! :)");
+}
+
+/**
+ * Initializes all sensors (LED, MOTOR, TOTAL).
+ */
+void initializeAllSensors() {
+  initializeSensor(ina219Led,   "LED",   LED_RGB_RED_PIN,    LED_RGB_GREEN_PIN);
+  initializeSensor(ina219Motor, "MOTOR", MOTOR_RGB_RED_PIN,  MOTOR_RGB_GREEN_PIN);
+  initializeSensor(ina219Total, "TOTAL", TOTAL_RGB_RED_PIN,  TOTAL_RGB_GREEN_PIN);
+
+  Serial.println("All INA219 sensors initialized successfully! :)");
+}
+
+/**
+ * Helper to check Wi-Fi connection in loop and reconnect if needed.
+ */
+void checkForWiFi() {
+  if (WiFi.status() != WL_CONNECTED) {
+    connectWiFi(false);
   }
 }
 
-void setup() {
-  Serial.println("Start");
+/**
+ * Helper to check MQTT connection in loop and reconnect if needed.
+ */
+void checkForMQTT() {
+  if (!mqttClient.connected()) {
+    connectMQTT();
+  }
+}
 
+// ======================= Arduino setup & loop =======================
+
+void setup() {
   Serial.begin(9600);
-  // Below is commented to allow running without USB (by connecting the Arduino directly to DC battery)
-  /*while (!Serial) {
+  // Uncomment if you want the code to wait for the serial monitor
+  /*
+  while (!Serial) {
     delay(1);
-  }*/
+  }
+  */
 
   // Set LED pins as outputs
-  pinMode(wifi_INDICATOR_LED, OUTPUT);
-  pinMode(mqtt_INDICATOR_LED, OUTPUT);
+  pinMode(WIFI_INDICATOR_LED, OUTPUT);
+  pinMode(MQTT_INDICATOR_LED, OUTPUT);
 
-  pinMode(led_RGB_RED_PIN, OUTPUT);
-  pinMode(led_RGB_GREEN_PIN, OUTPUT);
-  pinMode(motor_RGB_RED_PIN, OUTPUT);
-  pinMode(motor_RGB_GREEN_PIN, OUTPUT);
-  pinMode(total_RGB_RED_PIN, OUTPUT);
-  pinMode(total_RGB_GREEN_PIN, OUTPUT);
+  pinMode(LED_RGB_RED_PIN,    OUTPUT);
+  pinMode(LED_RGB_GREEN_PIN,  OUTPUT);
+  pinMode(MOTOR_RGB_RED_PIN,  OUTPUT);
+  pinMode(MOTOR_RGB_GREEN_PIN,OUTPUT);
+  pinMode(TOTAL_RGB_RED_PIN,  OUTPUT);
+  pinMode(TOTAL_RGB_GREEN_PIN,OUTPUT);
 
-  digitalWrite(wifi_INDICATOR_LED, HIGH);
-  digitalWrite(mqtt_INDICATOR_LED, HIGH);
+  // Initially turn on the Wi-Fi and MQTT indicator LEDs
+  setIndicatorLed(WIFI_INDICATOR_LED, true);
+  setIndicatorLed(MQTT_INDICATOR_LED, true);
 
-  digitalWrite(led_RGB_RED_PIN, 0);
-  digitalWrite(led_RGB_GREEN_PIN, 0);
+  // Clear RGB LED outputs
+  setSimpleRgb(LED_RGB_RED_PIN,    LED_RGB_GREEN_PIN,    false, false);
+  setSimpleRgb(MOTOR_RGB_RED_PIN,  MOTOR_RGB_GREEN_PIN,  false, false);
+  setSimpleRgb(TOTAL_RGB_RED_PIN,  TOTAL_RGB_GREEN_PIN,  false, false);
 
-  digitalWrite(motor_RGB_RED_PIN, 0);
-  digitalWrite(motor_RGB_GREEN_PIN, 0);
-
-  digitalWrite(total_RGB_RED_PIN, 0);
-  digitalWrite(total_RGB_GREEN_PIN, 0);
-
-  initializeSensors();
-
-  checkForWiFi(true);
-
-  connectToMQTT();
+  initializeAllSensors();
+  connectWiFi(true);  // First time: show a log
+  connectMQTT();
 
   timeClient.begin();
   timeClient.update();
 
   lastPublishTime = millis();
+
+  Serial.println("Setup completed.\n");
 }
 
 void loop() {
+  // Take one “sample” from each sensor
   samplesTaken++;
 
-  sum_power_mW_LED += ina219_LED.getPower_mW();
-  float temp_power_mW_LED = sum_power_mW_LED / samplesTaken;
+  sumPowerLed   += ina219Led.getPower_mW();
+  sumPowerMotor += ina219Motor.getPower_mW();
+  sumPowerTotal += ina219Total.getPower_mW();
 
-  sum_power_mW_MOTOR += ina219_MOTOR.getPower_mW();
-  float temp_power_mW_MOTOR = sum_power_mW_MOTOR / samplesTaken;
+  // Compute the rolling average so far
+  float avgPowerLed   = sumPowerLed   / samplesTaken;
+  float avgPowerMotor = sumPowerMotor / samplesTaken;
+  float avgPowerTotal = sumPowerTotal / samplesTaken;
 
-  sum_power_mW_TOTAL += ina219_TOTAL.getPower_mW();
-  float temp_power_mW_TOTAL = sum_power_mW_TOTAL / samplesTaken;
+  // Update each sensor’s RGB LED to reflect average usage
+  fadeRgbByReading(avgPowerLed,   200.0f, LED_MAX_THRESHOLD,   LED_RGB_RED_PIN,    LED_RGB_GREEN_PIN);
+  fadeRgbByReading(avgPowerMotor, 200.0f, MOTOR_MAX_THRESHOLD, MOTOR_RGB_RED_PIN,  MOTOR_RGB_GREEN_PIN);
+  fadeRgbByReading(avgPowerTotal, 200.0f, TOTAL_MAX_THRESHOLD, TOTAL_RGB_RED_PIN,  TOTAL_RGB_GREEN_PIN);
 
-  int fadeValue = map((long)temp_power_mW_LED, 200, led_MAXIMUM_THRESHOLD_MW, 0, 255);
-  fadeValue = constrain(fadeValue, 0, 255);
-  analogWrite(led_RGB_RED_PIN, fadeValue);
-  analogWrite(led_RGB_GREEN_PIN, 255 - fadeValue);
-
-  fadeValue = map((long)temp_power_mW_MOTOR, 200, motor_MAXIMUM_THRESHOLD_MW, 0, 255);
-  fadeValue = constrain(fadeValue, 0, 255);
-  analogWrite(motor_RGB_RED_PIN, fadeValue);
-  analogWrite(motor_RGB_GREEN_PIN, 255 - fadeValue);
-
-  fadeValue = map((long)temp_power_mW_TOTAL, 200, total_MAXIMUM_THRESHOLD_MW, 0, 255);
-  fadeValue = constrain(fadeValue, 0, 255);
-  analogWrite(total_RGB_RED_PIN, fadeValue);
-  analogWrite(total_RGB_GREEN_PIN, 255 - fadeValue);
-
+  // Publish data roughly every second
   if (millis() - lastPublishTime >= 1000) {
-    checkForWiFi(false);
+    checkForWiFi();
     checkForMQTT();
 
+    timeClient.update();
     long timestamp = timeClient.getEpochTime();
 
-    // Calculate the average power
-    float power_mW_LED = sum_power_mW_LED / samplesTaken;
-    float power_mW_MOTOR = sum_power_mW_MOTOR / samplesTaken;
-    float power_mW_TOTAL = sum_power_mW_TOTAL / samplesTaken;
-
-    float difference = (power_mW_MOTOR + power_mW_LED) - power_mW_TOTAL;
+    float difference = (avgPowerMotor + avgPowerLed) - avgPowerTotal;
 
     char payload[256];
     snprintf(payload, sizeof(payload),
-             "{"
-             "\"total_reading\":%.2f,"
-             "\"led_reading\":%.2f,"
-             "\"motor_reading\":%.2f,"
-             "\"difference\":%.2f,"
-             "\"samples\":%lu,"
-             "\"timestamp\":%lu"
-             "}",
-             power_mW_TOTAL, power_mW_LED, power_mW_MOTOR, difference, samplesTaken, timestamp);
-
+      "{"
+      "\"total_reading\":%.2f,"
+      "\"led_reading\":%.2f,"
+      "\"motor_reading\":%.2f,"
+      "\"difference\":%.2f,"
+      "\"samples\":%lu,"
+      "\"timestamp\":%lu"
+      "}",
+      avgPowerTotal, avgPowerLed, avgPowerMotor, difference, samplesTaken, timestamp
+    );
 
     Serial.println(payload);
 
@@ -226,11 +276,11 @@ void loop() {
     mqttClient.print(payload);
     mqttClient.endMessage();
 
+    // Reset counters and sums
     lastPublishTime = millis();
-
-    samplesTaken = 0;
-    sum_power_mW_LED = 0;
-    sum_power_mW_MOTOR = 0;
-    sum_power_mW_TOTAL = 0;
+    samplesTaken    = 0;
+    sumPowerLed     = 0.0f;
+    sumPowerMotor   = 0.0f;
+    sumPowerTotal   = 0.0f;
   }
 }
