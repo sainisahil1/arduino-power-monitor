@@ -10,7 +10,7 @@
 WiFiSSLClient        espClient;
 MqttClient           mqttClient(espClient);
 WiFiUDP              ntpUDP;
-NTPClient            timeClient(ntpUDP, "pool.ntp.org", 7200, 60000);
+NTPClient            timeClient(ntpUDP, "pool.ntp.org", 0, 60000);
 
 unsigned long lastPublishTime  = 0;
 unsigned long samplesTaken     = 0;
