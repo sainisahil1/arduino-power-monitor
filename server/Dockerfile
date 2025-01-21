@@ -1,21 +1,30 @@
-# Use an official OpenJDK image as the base image
-FROM azul/zulu-openjdk:17 AS build
+# First stage: build the application with Maven
+FROM openjdk:17-jdk-slim AS build
 
+# Install Maven manually
+RUN apt-get update && apt-get install -y maven
 
-# Set the working directory inside the container
 WORKDIR /app
 
-# Copy project files to the container
+# Confirm Maven is available
+RUN mvn -v
+
+# Copy the entire project (including pom.xml)
 COPY . .
 
-# Build the application and create the JAR file
-RUN ./mvnw clean package -DskipTests
+# Build the Spring Boot app
+RUN mvn clean package -DskipTests
 
-# Copy the built JAR file from the host machine to the container
-COPY /app/target/*.jar app.jar
+# Second stage: use a lighter image to run the application
+FROM openjdk:17-jdk-slim AS runtime
 
- # Expose the application port (same as in application.properties)
+WORKDIR /app
+
+# Copy the built JAR file from the build stage
+COPY --from=build /app/target/*.jar app.jar
+
+# Expose port
 EXPOSE 8080
 
- # Command to run the application
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Command to run the app
+CMD ["java", "-jar", "app.jar"]
