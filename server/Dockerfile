@@ -12,7 +12,7 @@ COPY . .
 RUN ./mvnw clean package -DskipTests
 
 # Copy the built JAR file from the host machine to the container
-COPY ./target/*.jar app.jar
+COPY /app/target/*.jar app.jar
 
  # Expose the application port (same as in application.properties)
 EXPOSE 8080
