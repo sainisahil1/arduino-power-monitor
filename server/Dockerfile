@@ -9,7 +9,7 @@ WORKDIR /app
 COPY . .
 
 # Build the application and create the JAR file
-RUN mvn clean package -DskipTests
+RUN ./mvnw clean package -DskipTests
 
 # Copy the built JAR file from the host machine to the container
 COPY ./target/*.jar app.jar
