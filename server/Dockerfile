@@ -1,5 +1,5 @@
 # Use an official OpenJDK image as the base image
-FROM azul/zulu-openjdk:17
+FROM azul/zulu-openjdk:17 AS build
 
 
 # Set the working directory inside the container
