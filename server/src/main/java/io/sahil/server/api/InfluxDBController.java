@@ -5,18 +5,16 @@ import io.sahil.server.core.repository.InfluxDBRepository;
 import io.sahil.server.util.HistoryType;
 import io.sahil.server.util.QueryType;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
  * @author Sahil Saini
  */
 @RestController
-@CrossOrigin
 public class InfluxDBController {
 
     private final InfluxDBRepository repository;
@@ -38,6 +36,15 @@ public class InfluxDBController {
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid parameters: " + e.getMessage());
         }
+    }
+
+    @RequestMapping(value = "/data", method = RequestMethod.OPTIONS)
+    public ResponseEntity<?> handleOptionsRequest() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Access-Control-Allow-Origin", "https://energyefficiency.netlify.app");
+        headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        headers.add("Access-Control-Allow-Headers", "*");
+        return ResponseEntity.ok().headers(headers).build();
     }
 
 }
