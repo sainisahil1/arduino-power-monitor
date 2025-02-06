@@ -3,7 +3,7 @@
 ### About
 
 - This repository is part of a univeristy IOT project.
-- The IOT project consist of Arduino circuit, MQTT broker, Spring Boot app, React.js app and a Flutter app.
+- The IOT project consist of Arduino circuit, MQTT broker, Spring Boot app and React.js app.
 - This particular repository consist of C++ code to be run on arduino, the Spring Boot app and MQTT broker implementation.
 - The objective of the project is to monitor power usage of various devices and provide realtime data along with daily, weekly, and monthly analysis.
 - For MQTT broker, EMQX is used to send data from Arduino.
