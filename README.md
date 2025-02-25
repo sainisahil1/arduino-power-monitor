@@ -10,6 +10,10 @@
 - Spring Boot app, web app and mobile app subscribes to MQTT topic for realtime updates.
 - For storing historical data, InfluxDB is used mainly for the reason that it is best suitable for IOT focused time-series data. The inverse-indexing makes it a better option for quering historical data based on time scale along with downsampling.
 
+### Circuit
+
+![](https://github.com/sainisahil1/arduino-power-monitor/blob/main/33470475-8d45-4dc4-949b-b42963a15cd7.jpg)
+
 ### Workflow
 
 ![](https://github.com/sainisahil1/arduino-power-monitor/blob/main/arduinoflow2.png)
